@@ -9,7 +9,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,12 +63,17 @@ jobs:
           mkdir -p "$HOME/.bubblewrap"
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > "$HOME/.bubblewrap/config.json"
           cat > /tmp/init-bubblewrap.exp <<'EOF'
-          set timeout 600
+          set timeout 180
+          log_user 1
           spawn bubblewrap init --manifest=https://setly-gym.vercel.app/manifest.webmanifest --directory=android-twa
           expect {
             -re {\?} {
               send -- "\r"
               exp_continue
+            }
+            timeout {
+              puts stderr "ERRO: Bubblewrap não avançou após 180 segundos aguardando uma resposta."
+              exit 124
             }
             eof
           }
