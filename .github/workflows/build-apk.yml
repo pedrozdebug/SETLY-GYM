@@ -67,12 +67,17 @@ jobs:
           log_user 1
           spawn bubblewrap init --manifest=https://setly-gym.vercel.app/manifest.webmanifest --directory=android-twa
           expect {
-            -re {\?} {
-              send -- "\r"
+            -re {\?\s+.*:\s*} {
+              set prompt $expect_out(0,string)
+              if {[regexp -nocase {First and Last names} $prompt]} {
+                send -- "Setly Gym\r"
+              } else {
+                send -- "\r"
+              }
               exp_continue
             }
             timeout {
-              puts stderr "ERRO: Bubblewrap não avançou após 180 segundos aguardando uma resposta."
+              puts stderr "ERRO: Bubblewrap não apresentou um prompt completo em 180 segundos."
               exit 124
             }
             eof
