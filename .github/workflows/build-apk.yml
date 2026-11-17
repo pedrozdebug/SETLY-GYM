@@ -1,0 +1,93 @@
+name: Build Setly Gym APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install app dependencies and build PWA
+        run: |
+          npm ci
+          npm run build
+
+      - name: Initialize Bubblewrap project
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.BUBBLEWRAP_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.BUBBLEWRAP_KEY_PASSWORD }}
+        run: |
+          npm install --global @bubblewrap/cli
+          mkdir -p android-twa
+          if [ ! -f android-twa/twa-manifest.json ]; then
+            cat > /tmp/bubblewrap-init.exp <<'EOF'
+          set timeout -1
+          spawn bubblewrap init --manifest=https://setly-gym.vercel.app/manifest.webmanifest --directory=android-twa
+          expect {
+            -re "(?i)password.*:" {
+              if { $env(BUBBLEWRAP_KEYSTORE_PASSWORD) eq "" } {
+                send_user "\nERRO: configure BUBBLEWRAP_KEYSTORE_PASSWORD e BUBBLEWRAP_KEY_PASSWORD nos Secrets do GitHub.\n"
+                exit 2
+              }
+              send -- "$env(BUBBLEWRAP_KEYSTORE_PASSWORD)\r"
+              exp_continue
+            }
+            -re "(?i)confirm.*password.*:" {
+              send -- "$env(BUBBLEWRAP_KEY_PASSWORD)\r"
+              exp_continue
+            }
+            -re "(?i)key.*password.*:" {
+              send -- "$env(BUBBLEWRAP_KEY_PASSWORD)\r"
+              exp_continue
+            }
+            eof
+          }
+          EOF
+            sudo apt-get update
+            sudo apt-get install -y expect
+            expect /tmp/bubblewrap-init.exp
+          fi
+
+      - name: Build signed APK
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.BUBBLEWRAP_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.BUBBLEWRAP_KEY_PASSWORD }}
+        run: |
+          cd android-twa
+          bubblewrap build --skipPwaValidation
+
+      - name: Generate Digital Asset Links
+        run: |
+          cd android-twa
+          bubblewrap fingerprint generateAssetLinks --output=assetlinks.json
+
+      - name: Upload APK, signing key and asset links
+        uses: actions/upload-artifact@v4
+        with:
+          name: setly-gym-android
+          path: |
+            android-twa/app-release-signed.apk
+            android-twa/android.keystore
+            android-twa/assetlinks.json
+            android-twa/twa-manifest.json
+          if-no-files-found: error
+          retention-days: 30
