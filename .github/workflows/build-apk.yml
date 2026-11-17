@@ -48,19 +48,23 @@ jobs:
           fi
           mkdir -p android-twa
           if [ ! -f android-twa/android-keystore ]; then
-            keytool -genkeypair -v               -keystore android-twa/android-keystore               -alias android -keyalg RSA -keysize 2048 -validity 10000               -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD"               -dname "CN=Setly Gym, OU=Android, O=Setly Gym, L=Santa Rosa, ST=RS, C=BR"
+            keytool -genkeypair -v \
+              -keystore android-twa/android-keystore \
+              -alias android -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+              -dname "CN=Setly Gym, OU=Android, O=Setly Gym, L=Santa Rosa, ST=RS, C=BR"
           fi
 
       - name: Initialize Bubblewrap project
         run: |
           npm install --global @bubblewrap/cli
-          sudo apt-get update
-          sudo apt-get install -y expect
+          mkdir -p "$HOME/.bubblewrap"
+          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > "$HOME/.bubblewrap/config.json"
           cat > /tmp/init-bubblewrap.exp <<'EOF'
           set timeout 600
           spawn bubblewrap init --manifest=https://setly-gym.vercel.app/manifest.webmanifest --directory=android-twa
           expect {
-            -re {\\?} {
+            -re {\?} {
               send -- "\r"
               exp_continue
             }
@@ -88,5 +92,5 @@ jobs:
             android-twa/android-keystore
             android-twa/assetlinks.json
             android-twa/twa-manifest.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 90
