@@ -57,6 +57,8 @@ jobs:
 
       - name: Initialize Bubblewrap project
         run: |
+          sudo apt-get update
+          sudo apt-get install -y expect
           npm install --global @bubblewrap/cli
           mkdir -p "$HOME/.bubblewrap"
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$ANDROID_HOME" > "$HOME/.bubblewrap/config.json"
